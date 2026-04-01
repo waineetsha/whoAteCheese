@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+<meta charset="UTF-8">
+<title>チーズドロボー</title>
+</head>
+
+<body>
+
+<h1>チーズドロボー</h1>
+
+<input id="name" placeholder="名前">
+<input id="room" placeholder="ルームID">
+
+<button id="createBtn" onclick="createRoom()">ルーム作成</button>
+<button id="joinBtn" onclick="joinRoom()">参加</button>
+
+<h2>プレイヤー</h2>
+<ul id="players"></ul>
+
+<button id="startBtn" onclick="startGame()" style="display:none;">
+ゲーム開始
+</button>
+
+<h2 id="night"></h2>
+
+<div id="henchmanArea"></div>
+
+<h2 id="team"></h2>
+
+<h2 id="discussion"></h2>
+
+<h2 id="vote"></h2>
+<div id="voteArea"></div>
+
+<h2 id="result"></h2>
+
+<script type="module" src="app.js"></script>
+
+</body>
+</html>
