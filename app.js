@@ -204,6 +204,19 @@ if(others.includes(thief)){
 msg+=" "+thief+"がチーズを食べました";
 }
 
+// ねぼすけ能力
+if(role==="sleepy" && others.length===0){
+
+  let targets=data.players.filter(p=>p!==myName);
+  
+  let target=targets[Math.floor(Math.random()*targets.length)];
+  
+  let time=data.wakeTimes[target];
+  
+  msg+=" "+target+"は"+time+"時に起きました。";
+  
+  }
+  
 document.getElementById("night").textContent=msg;
 
 setTimeout(async ()=>{
