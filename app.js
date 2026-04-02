@@ -367,7 +367,8 @@ team.textContent="";
 
 }
 
-}  
+}
+  
   else if(data.henchmen.includes(myName)){
   
   let thief;
@@ -416,7 +417,10 @@ async function startVote(){
 
 const ref=doc(db,"rooms",currentRoom);
 
-await updateDoc(ref,{phase:"vote"});
+await updateDoc(ref,{
+phase:"vote",
+runoff:[]
+});
 
 }
 
@@ -427,7 +431,6 @@ const area=document.getElementById("voteArea");
 if(data.votes && data.votes[myName]){
 
 area.innerHTML="投票済みです";
-
 return;
 
 }
@@ -436,7 +439,20 @@ area.innerHTML="";
 
 document.getElementById("vote").textContent="投票してください";
 
-data.players.filter(p=>p!==myName).forEach(p=>{
+let candidates;
+
+// 決選投票
+if(data.runoff && data.runoff.length>0){
+
+candidates=data.runoff;
+
+}else{
+
+candidates=data.players.filter(p=>p!==myName);
+
+}
+
+candidates.forEach(p=>{
 
 const btn=document.createElement("button");
 
@@ -500,18 +516,42 @@ count[t]=(count[t]||0)+1;
 }
 
 let max=0;
-let executed=null;
+let targets=[];
 
 for(let p in count){
 
 if(count[p]>max){
 
 max=count[p];
-executed=p;
+targets=[p];
+
+}else if(count[p]===max){
+
+targets.push(p);
 
 }
 
 }
+
+const ref=doc(db,"rooms",currentRoom);
+
+// 決選投票
+if(targets.length>1){
+
+document.getElementById("result").textContent=
+"同票のため決選投票を行います";
+
+updateDoc(ref,{
+votes:{},
+runoff:targets,
+phase:"vote"
+});
+
+return;
+
+}
+
+let executed=targets[0];
 
 let thief;
 
@@ -526,3 +566,4 @@ msg+=executed===thief?"ねぼすけ勝利":"ドロボー勝利";
 document.getElementById("result").textContent=msg;
 
 }
+
