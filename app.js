@@ -355,10 +355,19 @@ function runDiscussion(data){
   
   team.textContent="";
   
-  if(role==="thief"){
-  team.textContent=data.henchmen.join(", ")+" を手下にしました";
-  }
-  
+if(role==="thief"){
+
+if(data.henchmen.length>0){
+
+team.textContent=data.henchmen.join(", ")+" を手下にしました";
+
+}else{
+
+team.textContent="";
+
+}
+
+}  
   else if(data.henchmen.includes(myName)){
   
   let thief;
