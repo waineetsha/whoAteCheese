@@ -248,7 +248,7 @@ let henchmanCount=0;
 
 if(playerCount<=4){
 henchmanCount=0;
-}else if(playerCount<=5){
+}else if(playerCount<=7){
 henchmanCount=1;
 }else{
 henchmanCount=2;
