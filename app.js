@@ -428,28 +428,21 @@ function runVote(data){
 
 const area=document.getElementById("voteArea");
 
-if(data.votes && data.votes[myName]){
-
-area.innerHTML="投票済みです";
-return;
-
-}
-
 area.innerHTML="";
+
+if(data.votes && data.votes[myName]){
+area.textContent="投票済みです";
+return;
+}
 
 document.getElementById("vote").textContent="投票してください";
 
 let candidates;
 
-// 決選投票
 if(data.runoff && data.runoff.length>0){
-
 candidates=data.runoff;
-
 }else{
-
 candidates=data.players.filter(p=>p!==myName);
-
 }
 
 candidates.forEach(p=>{
@@ -538,8 +531,10 @@ const ref=doc(db,"rooms",currentRoom);
 // 決選投票
 if(targets.length>1){
 
-document.getElementById("result").textContent=
+document.getElementById("result").textContent =
 "同票のため決選投票を行います";
+
+document.getElementById("voteArea").innerHTML="";   // ←追加
 
 updateDoc(ref,{
 votes:{},
