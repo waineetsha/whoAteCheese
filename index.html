@@ -1,111 +1,336 @@
 <!DOCTYPE html>
-<html>
+<html lang="ja">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>チーズドロボー</title>
 <style>
-  body { font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 16px; }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-  /* ③ プレイヤー一行表示 */
+  :root {
+    --bg: #1a1a2e;
+    --surface: #16213e;
+    --surface2: #0f3460;
+    --accent: #e94560;
+    --accent2: #f5a623;
+    --text: #eaeaea;
+    --text-dim: #888;
+    --border: #2a2a4a;
+    --sys-color: #7ecfff;
+    --win-thief: #ff6b6b;
+    --win-sleepy: #6bff9e;
+    --radius: 10px;
+  }
+
+  html, body {
+    height: 100%;
+    font-family: 'Hiragino Kaku Gothic ProN', 'Noto Sans JP', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    font-size: 14px;
+  }
+
+  /* ===== LAYOUT ===== */
+  #app {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    max-width: 680px;
+    margin: 0 auto;
+  }
+
+  /* ヘッダー */
+  #header {
+    padding: 10px 16px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-shrink: 0;
+  }
+  #header h1 {
+    font-size: 1.1em;
+    font-weight: bold;
+    color: var(--accent2);
+    letter-spacing: 0.05em;
+  }
   #players {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: 8px;
-    margin: 8px 0;
-    font-size: 0.95em;
+    gap: 6px;
+    flex: 1;
+    font-size: 0.82em;
   }
   .player-count {
-    background: #333;
+    background: var(--accent);
     color: #fff;
     border-radius: 4px;
-    padding: 2px 8px;
+    padding: 1px 7px;
     font-weight: bold;
     white-space: nowrap;
   }
-  .player-names {
-    flex: 1;
-  }
-  .role-breakdown {
-    color: #666;
-    font-size: 0.9em;
-    white-space: nowrap;
+  .player-names { color: var(--text); }
+  .role-breakdown { color: var(--text-dim); white-space: nowrap; }
+
+  /* ===== ゲームエリア ===== */
+  #gameArea {
+    padding: 12px 16px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+    min-height: 0;
   }
 
-  /* ① 結果表示 */
-  .vote-log {
-    background: #f5f5f5;
-    border-left: 4px solid #ccc;
-    padding: 8px 12px;
-    margin: 12px 0;
+  /* ロビー */
+  #lobbyArea {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+  }
+  #lobbyArea input {
+    padding: 7px 10px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text);
     font-size: 0.95em;
-    line-height: 1.8;
+    width: 130px;
   }
-  .executed-info {
-    margin: 6px 0;
-    font-size: 1.05em;
-  }
-  .win-thief {
-    color: #c00;
-    font-weight: bold;
-    font-size: 1.1em;
-  }
-  .win-sleepy {
-    color: #007a00;
-    font-weight: bold;
-    font-size: 1.1em;
-  }
+  #lobbyArea input::placeholder { color: var(--text-dim); }
 
-  /* ② もう一回ボタン */
-  #replayBtn {
-    margin-top: 16px;
-    padding: 10px 28px;
-    font-size: 1em;
-    cursor: pointer;
-    background: #333;
-    color: #fff;
+  /* ボタン共通 */
+  button {
+    padding: 7px 16px;
     border: none;
     border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.9em;
+    font-family: inherit;
+    transition: opacity 0.15s;
   }
-  #replayBtn:hover { background: #555; }
-  #replayWait {
-    margin-top: 16px;
-    color: #888;
-    font-size: 0.95em;
+  button:hover { opacity: 0.82; }
+  .btn-primary { background: var(--accent); color: #fff; font-weight: bold; }
+  .btn-secondary { background: var(--surface2); color: var(--text); }
+  .btn-success { background: #2a7a4a; color: #fff; font-weight: bold; }
+
+  /* 夜・チーム情報 */
+  #nightMsg, #teamMsg {
+    font-size: 0.9em;
+    color: var(--text-dim);
+    margin-bottom: 6px;
+    line-height: 1.5;
   }
+  #nightMsg.private {
+    background: var(--surface2);
+    border-left: 3px solid var(--accent2);
+    padding: 8px 10px;
+    border-radius: 0 6px 6px 0;
+    color: var(--text);
+    margin-bottom: 8px;
+  }
+
+  /* タイマー */
+  #timerBar {
+    display: none;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 8px;
+  }
+  #timerBar.active { display: flex; }
+  #timerLabel { font-size: 0.85em; color: var(--text-dim); white-space: nowrap; }
+  #timerProgress {
+    flex: 1;
+    height: 6px;
+    background: var(--border);
+    border-radius: 3px;
+    overflow: hidden;
+  }
+  #timerFill {
+    height: 100%;
+    background: var(--accent2);
+    border-radius: 3px;
+    transition: width 1s linear, background 0.5s;
+    width: 100%;
+  }
+  #timerSec { font-size: 0.85em; color: var(--accent2); min-width: 40px; text-align: right; }
+
+  /* 投票エリア */
+  #voteSection { display: none; }
+  #voteSection.active { display: block; }
+  #voteLabel { font-size: 0.85em; color: var(--text-dim); margin-bottom: 6px; }
+  #voteButtons { display: flex; flex-wrap: wrap; gap: 6px; }
+  #voteButtons button { background: var(--surface2); color: var(--text); font-size: 0.9em; padding: 6px 14px; }
+  #voteButtons button:hover { background: var(--accent); color: #fff; }
+  #votedMsg { font-size: 0.85em; color: var(--text-dim); padding: 4px 0; display: none; }
+
+  /* 手下選択 */
+  #henchmanSection { display: none; }
+  #henchmanSection.active { display: block; }
+  #henchmanSection p { font-size: 0.85em; color: var(--text-dim); margin-bottom: 6px; }
+  #henchmanChecks { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; }
+  #henchmanChecks label { font-size: 0.9em; display: flex; align-items: center; gap: 4px; cursor: pointer; }
+
+  /* スタート・もう一回 */
+  #actionArea { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  #replayWait { font-size: 0.85em; color: var(--text-dim); }
+
+  /* ===== チャット ===== */
+  #chatArea {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+  }
+
+  #chatLog {
+    flex: 1;
+    overflow-y: auto;
+    padding: 12px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .msg {
+    display: flex;
+    flex-direction: column;
+    max-width: 80%;
+  }
+  .msg.system {
+    max-width: 100%;
+    align-self: stretch;
+  }
+  .msg.me { align-self: flex-end; align-items: flex-end; }
+  .msg.other { align-self: flex-start; }
+
+  .msg-name {
+    font-size: 0.72em;
+    color: var(--text-dim);
+    margin-bottom: 2px;
+    padding: 0 4px;
+  }
+  .msg-bubble {
+    padding: 7px 12px;
+    border-radius: 16px;
+    font-size: 0.9em;
+    line-height: 1.5;
+    word-break: break-word;
+  }
+  .msg.me .msg-bubble {
+    background: var(--surface2);
+    border-bottom-right-radius: 4px;
+  }
+  .msg.other .msg-bubble {
+    background: #252545;
+    border-bottom-left-radius: 4px;
+  }
+  .msg.system .msg-bubble {
+    background: transparent;
+    border: none;
+    padding: 4px 0;
+    color: var(--sys-color);
+    font-size: 0.82em;
+    border-radius: 0;
+  }
+  .msg.system.win .msg-bubble {
+    font-size: 1em;
+    font-weight: bold;
+    color: var(--accent2);
+    background: rgba(229,70,96,0.08);
+    border-radius: 8px;
+    padding: 10px 14px;
+  }
+
+  /* チャット入力 */
+  #chatInput {
+    display: flex;
+    gap: 8px;
+    padding: 10px 16px;
+    border-top: 1px solid var(--border);
+    background: var(--surface);
+    flex-shrink: 0;
+  }
+  #chatInput input {
+    flex: 1;
+    padding: 8px 12px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    color: var(--text);
+    font-size: 0.9em;
+    font-family: inherit;
+  }
+  #chatInput input::placeholder { color: var(--text-dim); }
+  #chatInput input:focus { outline: none; border-color: var(--surface2); }
+  #sendBtn { border-radius: 20px; padding: 8px 18px; }
 </style>
 </head>
 <body>
+<div id="app">
 
-<h1>チーズドロボー</h1>
+  <!-- ヘッダー：タイトル＋プレイヤー一覧 -->
+  <div id="header">
+    <h1>🧀 チーズドロボー</h1>
+    <div id="players"></div>
+  </div>
 
-<input id="name" placeholder="名前">
-<input id="room" placeholder="ルームID">
+  <!-- ゲーム操作エリア -->
+  <div id="gameArea">
 
-<button id="createBtn" onclick="createRoom()">ルーム作成</button>
-<button id="joinBtn" onclick="joinRoom()">参加</button>
+    <!-- ロビー -->
+    <div id="lobbyArea">
+      <input id="nameInput" placeholder="名前" maxlength="12">
+      <input id="roomInput" placeholder="ルームID">
+      <button class="btn-primary" onclick="createRoom()">作成</button>
+      <button class="btn-secondary" onclick="joinRoom()">参加</button>
+    </div>
 
-<h2>プレイヤー</h2>
-<div id="players"></div>
+    <!-- 夜・チーム情報（自分だけに見える） -->
+    <div id="nightMsg"></div>
+    <div id="teamMsg"></div>
 
-<button id="startBtn" onclick="startGame()" style="display:none;">
-  ゲーム開始
-</button>
+    <!-- タイマー -->
+    <div id="timerBar">
+      <span id="timerLabel">議論中</span>
+      <div id="timerProgress"><div id="timerFill"></div></div>
+      <span id="timerSec"></span>
+    </div>
 
-<h2 id="night"></h2>
+    <!-- 手下選択 -->
+    <div id="henchmanSection">
+      <p id="henchmanTitle"></p>
+      <div id="henchmanChecks"></div>
+      <button class="btn-primary" onclick="submitHenchmen()">手下決定</button>
+    </div>
 
-<div id="henchmanArea"></div>
+    <!-- 投票 -->
+    <div id="voteSection">
+      <div id="voteLabel">投票先を選んでください</div>
+      <div id="voteButtons"></div>
+      <div id="votedMsg">投票済みです</div>
+    </div>
 
-<h2 id="team"></h2>
+    <!-- スタート / もう一回 -->
+    <div id="actionArea">
+      <button id="startBtn" class="btn-success" onclick="startGame()" style="display:none;">ゲーム開始</button>
+      <span id="replayWait"></span>
+    </div>
 
-<h2 id="discussion"></h2>
+  </div>
 
-<h2 id="vote"></h2>
-<div id="voteArea"></div>
+  <!-- チャット -->
+  <div id="chatArea">
+    <div id="chatLog"></div>
+    <div id="chatInput">
+      <input id="msgInput" placeholder="メッセージを入力…" maxlength="200" onkeydown="if(event.key==='Enter')sendChat()">
+      <button class="btn-primary" id="sendBtn" onclick="sendChat()">送信</button>
+    </div>
+  </div>
 
-<h2 id="result"></h2>
-
+</div>
 <script type="module" src="app.js"></script>
-
 </body>
 </html>
