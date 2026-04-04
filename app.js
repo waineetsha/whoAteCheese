@@ -258,12 +258,16 @@ function handleNight(data) {
   nightEl.className = "private";
   nightEl.textContent = lines.join("\n");
 
-  // ③ 夜情報をチャットログに個人向けで表示（Firestoreには書かない）
-  lines.forEach(line => addChat("", "🌙 " + line, "system"));
-  // 議論フェーズ移行のお知らせも予約
-  setTimeout(() => {
-    addChat("", "━━ 議論フェーズ開始 ━━", "system");
-  }, 4000);
+  // ③ 役職＋夜情報を個人チャットに追加（Firestoreには書かない個人情報）
+  // renderChatLog と競合しないよう nightChatDone フラグで1回だけ実行
+  if (!window._nightChatDone) {
+    window._nightChatDone = true;
+    addChat("", `🎭 あなたの役職：【${getRoleLabel(role)}】`, "system");
+    lines.forEach(line => addChat("", "🌙 " + line, "system"));
+    setTimeout(() => {
+      addChat("", "━━ 議論フェーズ開始 ━━", "system");
+    }, 4000);
+  }
 
   setTimeout(async () => {
     if (role === "thief") {
@@ -519,6 +523,7 @@ window.replayGame = async function () {
 // ===== UIリセット =====
 
 function resetGameUI() {
+  window._nightChatDone = false;
   document.getElementById("nightMsg").textContent = "";
   document.getElementById("nightMsg").className = "";
   document.getElementById("teamMsg").textContent = "";
