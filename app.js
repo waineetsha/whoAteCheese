@@ -42,7 +42,7 @@ window.createRoom = async function () {
   myName = document.getElementById("name").value;
   const room = document.getElementById("room").value;
   const ref = doc(db, "rooms", room);
-  await setDoc(ref, { players: [myName], phase: "lobby" });
+  await setDoc(ref, { players: [myName], phase: "lobby", host: myName });
   currentRoom = room;
   hideLobbyUI();
   document.getElementById("startBtn").style.display = "block";
@@ -116,7 +116,21 @@ function subscribeRoom() {
     const data = snap.data();
     updatePlayers(data.players);
     if (data.phase === "lobby") return;
-    if (data.phase === "night") runNight(data);
+    if (data.phase === "night") {
+      // もう一回でnight phaseに入ったとき、result画面をリセット
+      ["night", "team", "discussion", "vote"].forEach(id => {
+        const el = document.getElementById(id);
+        el.style.display = "";
+        if (id !== "night") el.textContent = "";
+      });
+      ["henchmanArea", "voteArea"].forEach(id => {
+        const el = document.getElementById(id);
+        el.style.display = "";
+        el.innerHTML = "";
+      });
+      document.getElementById("result").innerHTML = "";
+      runNight(data);
+    }
     if (data.phase === "henchman") runHenchman(data);
     if (data.phase === "discussion") runDiscussion(data);
     if (data.phase === "vote") runVote(data);
@@ -361,16 +375,18 @@ function runResult(data) {
   html += `<div class="executed-info">最多票は<strong>${executed}</strong>。</div>`;
   html += `<div class="executed-info"><strong>${executed}</strong>は「${executedLabel}」なので、${winMsg}</div>`;
 
-  // ② もう一回ボタン
-  html += '<button id="replayBtn" onclick="replayGame()">もう一回</button>';
+  // ② もう一回ボタン（ホストのみ）
+  if (data.host === myName) {
+    html += '<button id="replayBtn" onclick="replayGame()">もう一回</button>';
+  } else {
+    html += '<div id="replayWait">ホストがもう一回を押すのを待っています…</div>';
+  }
 
   document.getElementById("result").innerHTML = html;
 }
 
-// ② もう一回
+// ② もう一回（ホストのみ・即ゲーム開始）
 window.replayGame = async function () {
-  const ref = doc(db, "rooms", currentRoom);
-
   // UIリセット
   ["night", "team", "discussion", "vote"].forEach(id => {
     const el = document.getElementById(id);
@@ -383,15 +399,7 @@ window.replayGame = async function () {
     el.innerHTML = "";
   });
   document.getElementById("result").innerHTML = "";
-  document.getElementById("startBtn").style.display = "block";
 
-  await updateDoc(ref, {
-    phase: "lobby",
-    roles: {},
-    wakeTimes: {},
-    eatTime: null,
-    votes: {},
-    henchmen: [],
-    runoff: []
-  });
+  // startGame()を直接呼ぶ → Firestoreがnight phaseに → 全員のsnapshotが反応
+  await startGame();
 };
