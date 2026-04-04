@@ -348,6 +348,9 @@ function runResult(data) {
 
   if (targets.length > 1) {
     document.getElementById("result").textContent = "同票のため決選投票を行います";
+    // display:none を解除してから決選投票フェーズへ
+    document.getElementById("vote").style.display = "";
+    document.getElementById("voteArea").style.display = "";
     document.getElementById("voteArea").innerHTML = "";
     updateDoc(ref, { votes: {}, runoff: targets, phase: "vote" });
     return;
