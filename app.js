@@ -23,6 +23,7 @@ const db = getFirestore(app);
 
 let currentRoom = null;
 let myName = null;
+let hasVoted = false;
 
 // ③ 人数別役職内訳
 function getRoleBreakdown(playerCount) {
@@ -279,23 +280,24 @@ function runDiscussion(data) {
 }
 
 async function startVote() {
+  hasVoted = false;
   const ref = doc(db, "rooms", currentRoom);
   await updateDoc(ref, { phase: "vote", runoff: [] });
 }
 
 function runVote(data) {
   const area = document.getElementById("voteArea");
-  area.innerHTML = "";
 
-  if (data.votes && data.votes[myName]) {
+  if (hasVoted) {
     area.textContent = "投票済みです";
     return;
   }
 
+  area.innerHTML = "";
   document.getElementById("vote").textContent = "投票してください";
 
   let candidates = (data.runoff && data.runoff.length > 0)
-    ? data.runoff
+    ? data.runoff.filter(p => p !== myName)
     : data.players.filter(p => p !== myName);
 
   candidates.forEach(p => {
@@ -308,12 +310,13 @@ function runVote(data) {
 }
 
 window.submitVote = async function (target) {
+  hasVoted = true;
+  document.getElementById("voteArea").textContent = "投票済みです";
   const ref = doc(db, "rooms", currentRoom);
   const snap = await getDoc(ref);
   let votes = snap.data().votes || {};
   votes[myName] = target;
   await updateDoc(ref, { votes });
-  document.getElementById("voteArea").innerHTML = "投票済みです";
   checkVotes();
 };
 
@@ -351,6 +354,7 @@ function runResult(data) {
     // display:none を解除してから決選投票フェーズへ
     document.getElementById("vote").style.display = "";
     document.getElementById("voteArea").style.display = "";
+    hasVoted = false;
     document.getElementById("voteArea").innerHTML = "";
     updateDoc(ref, { votes: {}, runoff: targets, phase: "vote" });
     return;
