@@ -108,7 +108,6 @@ window.createRoom = async function () {
   });
   currentRoom = room;
   hideLobbyUI();
-  document.getElementById("startBtn").style.display = "block";
   subscribeRoom();
 };
 
@@ -128,7 +127,6 @@ window.joinRoom = async function () {
   });
   currentRoom = room;
   hideLobbyUI();
-  document.getElementById("startBtn").style.display = "block";
   subscribeRoom();
 };
 
@@ -187,6 +185,11 @@ function subscribeRoom() {
     // プレイヤー表示
     updatePlayers(data.players);
 
+    // ① ホストのみスタートボタン表示（lobbyフェーズ中）
+    if (data.phase === "lobby" && data.host === myName) {
+      document.getElementById("startBtn").style.display = "block";
+    }
+
     // チャットログ同期（差分のみ）
     renderChatLog(data.chatLog);
 
@@ -238,6 +241,8 @@ function handleNight(data) {
   for (let p in data.roles) { if (data.roles[p] === "thief") thief = p; }
 
   let cheese = wakeTime < eatTime ? "残っていました🧀" : "残っていませんでした";
+  // ② 役職表示を更新（ゲーム中ずっと表示）
+  document.getElementById("roleMsg").textContent = `役職：【${getRoleLabel(data.roles[myName])}】`;
   let lines = [`あなたは ${wakeTime} 時に起きました。`];
   if (others.length > 0) lines.push(`同時に起きた人：${others.join(", ")}`);
   if (role !== "thief") lines.push(`チーズは${cheese}`);
@@ -252,6 +257,13 @@ function handleNight(data) {
   const nightEl = document.getElementById("nightMsg");
   nightEl.className = "private";
   nightEl.textContent = lines.join("\n");
+
+  // ③ 夜情報をチャットログに個人向けで表示（Firestoreには書かない）
+  lines.forEach(line => addChat("", "🌙 " + line, "system"));
+  // 議論フェーズ移行のお知らせも予約
+  setTimeout(() => {
+    addChat("", "━━ 議論フェーズ開始 ━━", "system");
+  }, 4000);
 
   setTimeout(async () => {
     if (role === "thief") {
@@ -319,7 +331,6 @@ window.submitHenchmen = async function () {
 
 function handleDiscussion(data) {
   document.getElementById("henchmanSection").classList.remove("active");
-  document.getElementById("nightMsg").textContent = ""; // 夜情報は議論中も残してOK→消す場合はここ
 
   const role = data.roles[myName];
 
@@ -416,8 +427,8 @@ window.submitVote = async function (target) {
   document.getElementById("voteButtons").style.display = "none";
   document.getElementById("votedMsg").style.display = "block";
 
-  // チャットにシステムメッセージ（自分の投票）
-  // ※全員に見せないため個人チャットはしない。集計後に全開示
+  // ④ 自分の投票先をローカルのチャットに表示
+  addChat("", `🗳 あなたは「${target}」に投票しました`, "system");
 
   const ref = doc(db, "rooms", currentRoom);
   const snap = await getDoc(ref);
