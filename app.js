@@ -172,7 +172,7 @@ window.startGame = async function () {
   // ⑦ chatLogを新配列でリセット（arrayUnionではなく[]で上書き）
   await updateDoc(ref, {
     roles, wakeTimes, eatTime, votes: {},
-    henchmen: players.filter((_, i) => henchmanIndices.has(i)),
+    henchmen: [],
     phase: "night", runoff: [],
     chatLog: [{ type: "system", text: "━━ ゲーム開始！夜のフェーズ ━━" }]
   });
@@ -240,34 +240,46 @@ function handleNight(data) {
   let thief = null;
   for (let p in data.roles) { if (data.roles[p] === "thief") thief = p; }
 
-  // ② 役職を常時表示
+  // 役職を常時表示（roleMsg）
   document.getElementById("roleMsg").textContent = `役職：【${getRoleLabel(role)}】`;
 
-  // 個人向け夜ログをローカルチャットに表示
-  localSys(`🎭 あなたの役職：【${getRoleLabel(role)}】`);
-  localSys(`🌙 あなたは ${wakeTime} 時に起きました`);
-
-  if (others.length > 0) localSys(`👥 同時に起きた人：${others.join(", ")}`);
-
-  // ⑤ チーズ情報は全員に表示（手下も含む）
+  // ① nightMsgにピン止め情報を構築
+  let pinLines = [`役職：【${getRoleLabel(role)}】`, `${wakeTime} 時に起きました`];
+  if (others.length > 0) pinLines.push(`同時に起きた人：${others.join(", ")}`);
   if (role === "thief") {
-    localSys("🧀 あなたはチーズを食べました");
+    pinLines.push("チーズを食べました🧀");
   } else {
-    const cheese = wakeTime < eatTime ? "残っていました🧀" : "残っていませんでした";
-    localSys(`🧀 チーズは${cheese}`);
+    const cheese = wakeTime < eatTime ? "チーズは残っていました🧀" : "チーズは残っていませんでした";
+    pinLines.push(cheese);
   }
-
-  if (others.includes(thief)) localSys(`⚠️ ${thief} がチーズを食べました`);
-
-  // ねぼすけ能力：一人で起きたとき別の人の起床時刻がわかる
+  if (others.includes(thief)) pinLines.push(`${thief} がチーズを食べました`);
   if (role === "sleepy" && others.length === 0) {
     const targets = data.players.filter(p => p !== myName);
     const target = targets[Math.floor(Math.random() * targets.length)];
-    localSys(`🔍 ${target} は ${data.wakeTimes[target]} 時に起きました`);
+    pinLines.push(`${target} は ${data.wakeTimes[target]} 時に起きました`);
+  }
+  const nightEl = document.getElementById("nightMsg");
+  nightEl.className = "private";
+  nightEl.textContent = pinLines.join("　|　");
+
+  // ② チャットログ：Firestoreの「ゲーム開始」の後に個人ログを追加
+  // renderChatLogが先に走るのでlocalSysは後に追加される → 順番OK
+  localSys(`🎭 あなたの役職：【${getRoleLabel(role)}】`);
+  localSys(`🌙 あなたは ${wakeTime} 時に起きました`);
+  if (others.length > 0) localSys(`👥 同時に起きた人：${others.join(", ")}`);
+  if (role === "thief") {
+    localSys("🧀 あなたはチーズを食べました");
+  } else {
+    const cheese2 = wakeTime < eatTime ? "残っていました🧀" : "残っていませんでした";
+    localSys(`🧀 チーズは${cheese2}`);
+  }
+  if (others.includes(thief)) localSys(`⚠️ ${thief} がチーズを食べました`);
+  if (role === "sleepy" && others.length === 0) {
+    const targets2 = data.players.filter(p => p !== myName);
+    const target2 = targets2[Math.floor(Math.random() * targets2.length)];
+    localSys(`🔍 ${target2} は ${data.wakeTimes[target2]} 時に起きました`);
   }
 
-  // ①③ 手下選択フェーズへ（ドロボーが遷移させる）
-  // 非ドロボーには「チーズドロボーが手下を選んでいます」をローカル表示
   if (role !== "thief") {
     setTimeout(() => {
       localSys("⏳ チーズドロボーが手下を選んでいます...");
@@ -346,21 +358,29 @@ function handleDiscussion(data) {
 
   const role = data.roles[myName];
 
-  // ② チーズドロボーのログ：手下を発表
+  // rolesから仲間を特定（henchmenはドロボーが手動選択した配列なので roles で判定）
+  let thiefName = null;
+  const henchmanNames = [];
+  for (let p in data.roles) {
+    if (data.roles[p] === "thief") thiefName = p;
+    if (data.roles[p] === "henchman") henchmanNames.push(p);
+  }
+
+  // ② ドロボーのログ：手下を発表（rolesに henchman がいれば）
   if (role === "thief") {
-    if (data.henchmen && data.henchmen.length > 0) {
-      localSys(`🤝 ${data.henchmen.join(", ")} を手下にしました`);
-      document.getElementById("teamMsg").textContent = `🤝 手下：${data.henchmen.join(", ")}`;
+    if (henchmanNames.length > 0) {
+      localSys(`🤝 ${henchmanNames.join(", ")} を手下にしました`);
+      document.getElementById("teamMsg").textContent = `🤝 手下：${henchmanNames.join(", ")}`;
     }
   }
-  // ③ 手下のログ：誰のドロボーになったか
-  else if (data.henchmen && data.henchmen.includes(myName)) {
-    let thief;
-    for (let p in data.roles) { if (data.roles[p] === "thief") thief = p; }
-    const others = data.henchmen.filter(p => p !== myName);
-    localSys(`🤝 あなたは ${thief} の手下になりました` + (others.length > 0 ? `　仲間：${others.join(", ")}` : ""));
+  // ③ 手下のログ：誰のドロボーになったか（roles で判定）
+  else if (role === "henchman") {
+    const others = henchmanNames.filter(p => p !== myName);
+    localSys(`🤝 あなたは ${thiefName} の手下になりました` + (others.length > 0 ? `　仲間：${others.join(", ")}` : ""));
     document.getElementById("teamMsg").textContent =
-      `🤝 ドロボー：${thief}` + (others.length > 0 ? `　仲間：${others.join(", ")}` : "");
+      `🤝 ドロボー：${thiefName}` + (others.length > 0 ? `　仲間：${others.join(", ")}` : "");
+    // ③ roleMsg も手下に更新
+    document.getElementById("roleMsg").textContent = "役職：【手下】";
   }
 
   // ④ 全員向け：議論フェーズ開始をFirestoreに書き込む（ホストのみ）
