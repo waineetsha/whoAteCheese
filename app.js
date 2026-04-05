@@ -192,12 +192,13 @@ function subscribeRoom() {
 
     if (data.phase === "lobby") return;
 
-    // roles が確定していれば常に roleMsg を更新（リロード対応）
-    if (data.roles && data.roles[myName]) {
+    const phaseKey = data.phase + "_" + (data.runoff ? data.runoff.length : 0);
+
+    // roles が確定していれば roleMsg を更新（night以降のみ・リロード対応）
+    const nightPhases = ["night", "henchman", "discussion", "vote", "result"];
+    if (nightPhases.includes(data.phase) && data.roles && data.roles[myName]) {
       document.getElementById("roleMsg").textContent = `役職：【${getRoleLabel(data.roles[myName])}】`;
     }
-
-    const phaseKey = data.phase + "_" + (data.runoff ? data.runoff.length : 0);
     if (phaseKey !== lastPhase) {
       lastPhase = phaseKey;
       if (data.phase === "night")      handleNight(data);
