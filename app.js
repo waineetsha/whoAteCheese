@@ -203,6 +203,11 @@ function subscribeRoom() {
 
     if (data.phase === "lobby") return;
 
+    // roles が確定していれば常に roleMsg を更新（リロード対応）
+    if (data.roles && data.roles[myName]) {
+      document.getElementById("roleMsg").textContent = `役職：【${getRoleLabel(data.roles[myName])}】`;
+    }
+
     const phaseKey = data.phase + "_" + (data.runoff ? data.runoff.length : 0);
     if (phaseKey !== lastPhase) {
       lastPhase = phaseKey;
@@ -385,8 +390,6 @@ function handleDiscussion(data) {
     localSys(`🤝 あなたは ${thiefName} の手下になりました` + (others.length > 0 ? `　仲間：${others.join(", ")}` : ""));
     document.getElementById("teamMsg").textContent =
       `🤝 ドロボー：${thiefName}` + (others.length > 0 ? `　仲間：${others.join(", ")}` : "");
-    // ③ roleMsg も手下に更新
-    document.getElementById("roleMsg").textContent = "役職：【手下】";
   }
 
   // ④ 全員向け：議論フェーズ開始をFirestoreに書き込む（ホストのみ）
