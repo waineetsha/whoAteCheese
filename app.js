@@ -1,6 +1,6 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
 import {
-  getFirestore, doc, setDoc, getDoc, updateDoc, onSnapshot, arrayUnion, serverTimestamp
+  getFirestore, doc, setDoc, getDoc, updateDoc, onSnapshot, arrayUnion
 } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
 const firebaseConfig = {
@@ -21,8 +21,10 @@ let myName = null;
 let hasVoted = false;
 let timerInterval = null;
 let lastPhase = null;
-let lastRunoffLength = 0;
 let henchmanCountGlobal = 0;
+
+// Firestoreチャットの既読カウント
+let chatRenderedCount = 0;
 
 // ===== ユーティリティ =====
 
@@ -39,10 +41,9 @@ function getRoleLabel(role) {
   return "ねぼすけ";
 }
 
-// ===== チャット =====
+// ===== チャット描画 =====
 
-function addChat(name, text, type = "other") {
-  // type: "me" | "other" | "system" | "win"
+function addMsgDOM(name, text, type) {
   const log = document.getElementById("chatLog");
   const div = document.createElement("div");
   div.className = "msg " + (type === "win" ? "system win" : type);
@@ -56,35 +57,39 @@ function addChat(name, text, type = "other") {
 
   const bubble = document.createElement("div");
   bubble.className = "msg-bubble";
-  bubble.textContent = text;
+  // ⑥ 投票結果などの改行を<br>で表示
+  if (text.includes("\n")) {
+    text.split("\n").forEach((line, i) => {
+      if (i > 0) bubble.appendChild(document.createElement("br"));
+      bubble.appendChild(document.createTextNode(line));
+    });
+  } else {
+    bubble.textContent = text;
+  }
   div.appendChild(bubble);
   log.appendChild(div);
   log.scrollTop = log.scrollHeight;
 }
 
-function sysMsg(text) { addChat("", text, "system"); }
-function winMsg(text) { addChat("", text, "win"); }
-
-// Firestoreのchatログを購読して表示（既読管理はインデックスで）
-let chatRenderedCount = 0;
-
+// Firestoreのチャットログを差分描画
 function renderChatLog(chatLog) {
   if (!chatLog) return;
   for (let i = chatRenderedCount; i < chatLog.length; i++) {
-    const entry = chatLog[i];
-    if (entry.type === "system") { sysMsg(entry.text); }
-    else if (entry.type === "win") { winMsg(entry.text); }
-    else {
-      const type = entry.name === myName ? "me" : "other";
-      addChat(entry.name, entry.text, type);
-    }
+    const e = chatLog[i];
+    if (e.type === "system") addMsgDOM("", e.text, "system");
+    else if (e.type === "win") addMsgDOM("", e.text, "win");
+    else addMsgDOM(e.name, e.text, e.name === myName ? "me" : "other");
   }
   chatRenderedCount = chatLog.length;
 }
 
-async function pushChat(entry) {
+// 個人向けメッセージ（Firestoreに書かない）
+function localSys(text) { addMsgDOM("", text, "system"); }
+
+// Firestoreに全員向けシステムメッセージを書き込む
+async function pushSys(text) {
   const ref = doc(db, "rooms", currentRoom);
-  await updateDoc(ref, { chatLog: arrayUnion(entry) });
+  await updateDoc(ref, { chatLog: arrayUnion({ type: "system", text }) });
 }
 
 window.sendChat = async function () {
@@ -92,7 +97,8 @@ window.sendChat = async function () {
   const text = input.value.trim();
   if (!text || !currentRoom) return;
   input.value = "";
-  await pushChat({ name: myName, text, type: "user" });
+  const ref = doc(db, "rooms", currentRoom);
+  await updateDoc(ref, { chatLog: arrayUnion({ name: myName, text, type: "user" }) });
 };
 
 // ===== ロビー =====
@@ -107,7 +113,7 @@ window.createRoom = async function () {
     chatLog: [{ type: "system", text: `ルーム「${room}」が作成されました` }]
   });
   currentRoom = room;
-  hideLobbyUI();
+  document.getElementById("lobbyArea").style.display = "none";
   subscribeRoom();
 };
 
@@ -126,19 +132,15 @@ window.joinRoom = async function () {
     chatLog: arrayUnion({ type: "system", text: `${myName} が参加しました` })
   });
   currentRoom = room;
-  hideLobbyUI();
+  document.getElementById("lobbyArea").style.display = "none";
   subscribeRoom();
 };
-
-function hideLobbyUI() {
-  document.getElementById("lobbyArea").style.display = "none";
-}
 
 // ===== ゲーム開始 =====
 
 window.startGame = async function () {
   document.getElementById("startBtn").style.display = "none";
-  document.getElementById("actionArea").querySelector("#replayWait").textContent = "";
+  document.getElementById("replayWait").textContent = "";
 
   const ref = doc(db, "rooms", currentRoom);
   const snap = await getDoc(ref);
@@ -167,6 +169,7 @@ window.startGame = async function () {
   players.forEach(p => { wakeTimes[p] = Math.floor(Math.random() * 6) + 1; });
   const eatTime = wakeTimes[players[thiefIndex]];
 
+  // ⑦ chatLogを新配列でリセット（arrayUnionではなく[]で上書き）
   await updateDoc(ref, {
     roles, wakeTimes, eatTime, votes: {},
     henchmen: players.filter((_, i) => henchmanIndices.has(i)),
@@ -182,7 +185,6 @@ function subscribeRoom() {
   onSnapshot(ref, (snap) => {
     const data = snap.data();
 
-    // プレイヤー表示
     updatePlayers(data.players);
 
     // ① ホストのみスタートボタン表示（lobbyフェーズ中）
@@ -190,20 +192,19 @@ function subscribeRoom() {
       document.getElementById("startBtn").style.display = "block";
     }
 
-    // チャットログ同期（差分のみ）
+    // Firestoreチャット差分描画
     renderChatLog(data.chatLog);
 
     if (data.phase === "lobby") return;
 
-    // フェーズ変化時のみ各関数を呼ぶ（runoffの変化も検知）
     const phaseKey = data.phase + "_" + (data.runoff ? data.runoff.length : 0);
     if (phaseKey !== lastPhase) {
       lastPhase = phaseKey;
-      if (data.phase === "night") handleNight(data);
-      if (data.phase === "henchman") handleHenchman(data);
+      if (data.phase === "night")      handleNight(data);
+      if (data.phase === "henchman")   handleHenchman(data);
       if (data.phase === "discussion") handleDiscussion(data);
-      if (data.phase === "vote") handleVote(data);
-      if (data.phase === "result") handleResult(data);
+      if (data.phase === "vote")       handleVote(data);
+      if (data.phase === "result")     handleResult(data);
     }
   });
 }
@@ -225,7 +226,6 @@ function updatePlayers(players) {
 // ===== 夜 =====
 
 function handleNight(data) {
-  // UIリセット
   resetGameUI();
 
   const role = data.roles[myName];
@@ -240,33 +240,38 @@ function handleNight(data) {
   let thief = null;
   for (let p in data.roles) { if (data.roles[p] === "thief") thief = p; }
 
-  let cheese = wakeTime < eatTime ? "残っていました🧀" : "残っていませんでした";
-  // ② 役職表示を更新（ゲーム中ずっと表示）
-  document.getElementById("roleMsg").textContent = `役職：【${getRoleLabel(data.roles[myName])}】`;
-  let lines = [`あなたは ${wakeTime} 時に起きました。`];
-  if (others.length > 0) lines.push(`同時に起きた人：${others.join(", ")}`);
-  if (role !== "thief") lines.push(`チーズは${cheese}`);
-  if (role === "thief") lines.push("あなたはチーズを食べました🧀");
-  if (others.includes(thief)) lines.push(`${thief} がチーズを食べました`);
-  if (role === "sleepy" && others.length === 0) {
-    let targets = data.players.filter(p => p !== myName);
-    let target = targets[Math.floor(Math.random() * targets.length)];
-    lines.push(`${target} は ${data.wakeTimes[target]} 時に起きました。`);
+  // ② 役職を常時表示
+  document.getElementById("roleMsg").textContent = `役職：【${getRoleLabel(role)}】`;
+
+  // 個人向け夜ログをローカルチャットに表示
+  localSys(`🎭 あなたの役職：【${getRoleLabel(role)}】`);
+  localSys(`🌙 あなたは ${wakeTime} 時に起きました`);
+
+  if (others.length > 0) localSys(`👥 同時に起きた人：${others.join(", ")}`);
+
+  // ⑤ チーズ情報は全員に表示（手下も含む）
+  if (role === "thief") {
+    localSys("🧀 あなたはチーズを食べました");
+  } else {
+    const cheese = wakeTime < eatTime ? "残っていました🧀" : "残っていませんでした";
+    localSys(`🧀 チーズは${cheese}`);
   }
 
-  const nightEl = document.getElementById("nightMsg");
-  nightEl.className = "private";
-  nightEl.textContent = lines.join("\n");
+  if (others.includes(thief)) localSys(`⚠️ ${thief} がチーズを食べました`);
 
-  // ③ 役職＋夜情報を個人チャットに追加（Firestoreには書かない個人情報）
-  // renderChatLog と競合しないよう nightChatDone フラグで1回だけ実行
-  if (!window._nightChatDone) {
-    window._nightChatDone = true;
-    addChat("", `🎭 あなたの役職：【${getRoleLabel(role)}】`, "system");
-    lines.forEach(line => addChat("", "🌙 " + line, "system"));
+  // ねぼすけ能力：一人で起きたとき別の人の起床時刻がわかる
+  if (role === "sleepy" && others.length === 0) {
+    const targets = data.players.filter(p => p !== myName);
+    const target = targets[Math.floor(Math.random() * targets.length)];
+    localSys(`🔍 ${target} は ${data.wakeTimes[target]} 時に起きました`);
+  }
+
+  // ①③ 手下選択フェーズへ（ドロボーが遷移させる）
+  // 非ドロボーには「チーズドロボーが手下を選んでいます」をローカル表示
+  if (role !== "thief") {
     setTimeout(() => {
-      addChat("", "━━ 議論フェーズ開始 ━━", "system");
-    }, 4000);
+      localSys("⏳ チーズドロボーが手下を選んでいます...");
+    }, 1000);
   }
 
   setTimeout(async () => {
@@ -277,7 +282,7 @@ function handleNight(data) {
   }, 4000);
 }
 
-// ===== 手下 =====
+// ===== 手下選択 =====
 
 function handleHenchman(data) {
   const role = data.roles[myName];
@@ -286,7 +291,10 @@ function handleHenchman(data) {
   if (playerCount >= 5 && playerCount <= 7) henchmanCountGlobal = 1;
   if (playerCount >= 8) henchmanCountGlobal = 2;
 
-  if (role !== "thief") return; // ドロボー以外は待つだけ（チャットに表示済み）
+  if (role !== "thief") {
+    // ドロボー以外は待機（夜フェーズでメッセージ済み）
+    return;
+  }
 
   if (henchmanCountGlobal === 0) {
     setTimeout(async () => {
@@ -338,38 +346,43 @@ function handleDiscussion(data) {
 
   const role = data.roles[myName];
 
-  // チームinfo（自分だけ）
-  let teamText = "";
-  if (role === "thief" && data.henchmen && data.henchmen.length > 0) {
-    teamText = `🤝 手下：${data.henchmen.join(", ")}`;
-  } else if (data.henchmen && data.henchmen.includes(myName)) {
+  // ② チーズドロボーのログ：手下を発表
+  if (role === "thief") {
+    if (data.henchmen && data.henchmen.length > 0) {
+      localSys(`🤝 ${data.henchmen.join(", ")} を手下にしました`);
+      document.getElementById("teamMsg").textContent = `🤝 手下：${data.henchmen.join(", ")}`;
+    }
+  }
+  // ③ 手下のログ：誰のドロボーになったか
+  else if (data.henchmen && data.henchmen.includes(myName)) {
     let thief;
     for (let p in data.roles) { if (data.roles[p] === "thief") thief = p; }
-    let others = data.henchmen.filter(p => p !== myName);
-    teamText = `🤝 ドロボー：${thief}` + (others.length > 0 ? `　仲間：${others.join(", ")}` : "");
-  }
-  if (teamText) {
-    const teamEl = document.getElementById("teamMsg");
-    teamEl.textContent = teamText;
+    const others = data.henchmen.filter(p => p !== myName);
+    localSys(`🤝 あなたは ${thief} の手下になりました` + (others.length > 0 ? `　仲間：${others.join(", ")}` : ""));
+    document.getElementById("teamMsg").textContent =
+      `🤝 ドロボー：${thief}` + (others.length > 0 ? `　仲間：${others.join(", ")}` : "");
   }
 
-  // タイマー（議論180秒）
+  // ④ 全員向け：議論フェーズ開始をFirestoreに書き込む（ホストのみ）
+  if (data.host === myName) {
+    pushSys("━━ 議論フェーズ　誰がチーズドロボーか話し合ってください ━━");
+  }
+
+  // タイマー
   if (timerInterval) clearInterval(timerInterval);
   const total = 180;
   let remaining = total;
   const bar = document.getElementById("timerBar");
   const fill = document.getElementById("timerFill");
   const sec = document.getElementById("timerSec");
-  const label = document.getElementById("timerLabel");
   bar.classList.add("active");
-  label.textContent = "議論中";
+  document.getElementById("timerLabel").textContent = "議論中";
 
   timerInterval = setInterval(() => {
     remaining--;
     sec.textContent = remaining + "s";
     fill.style.width = (remaining / total * 100) + "%";
     if (remaining <= 30) fill.style.background = "var(--accent)";
-
     if (remaining <= 0) {
       clearInterval(timerInterval);
       bar.classList.remove("active");
@@ -411,10 +424,10 @@ function handleVote(data) {
   btns.innerHTML = "";
 
   const isRunoff = data.runoff && data.runoff.length > 0;
-  const voteLabel = document.getElementById("voteLabel");
-  voteLabel.textContent = isRunoff ? "🔁 決選投票：投票先を選んでください" : "投票先を選んでください";
+  document.getElementById("voteLabel").textContent =
+    isRunoff ? "🔁 決選投票：投票先を選んでください" : "投票先を選んでください";
 
-  let candidates = isRunoff
+  const candidates = isRunoff
     ? data.runoff.filter(p => p !== myName)
     : data.players.filter(p => p !== myName);
 
@@ -431,8 +444,8 @@ window.submitVote = async function (target) {
   document.getElementById("voteButtons").style.display = "none";
   document.getElementById("votedMsg").style.display = "block";
 
-  // ④ 自分の投票先をローカルのチャットに表示
-  addChat("", `🗳 あなたは「${target}」に投票しました`, "system");
+  // ④ 自分の投票先をローカルチャットに表示
+  localSys(`🗳 あなたは「${target}」に投票しました`);
 
   const ref = doc(db, "rooms", currentRoom);
   const snap = await getDoc(ref);
@@ -440,7 +453,6 @@ window.submitVote = async function (target) {
   votes[myName] = target;
   await updateDoc(ref, { votes });
 
-  // 全員投票済みチェック
   const data2 = (await getDoc(ref)).data();
   if (Object.keys(data2.votes).length === data2.players.length) {
     await updateDoc(ref, { phase: "result" });
@@ -477,31 +489,28 @@ async function handleResult(data) {
     return;
   }
 
-  // 結果確定：投票ログをチャットに流す（ホストのみ書き込み）
+  // 結果確定（ホストのみFirestoreに書き込み）
   if (data.host === myName) {
-    let logLines = [];
-    for (let voter in data.votes) {
-      logLines.push(`${voter}　▶　${data.votes[voter]}`);
-    }
     const executed = targets[0];
     const executedRole = data.roles[executed];
     const executedLabel = getRoleLabel(executedRole);
     const isThiefTeam = executedRole === "thief" || executedRole === "henchman";
-    const winText = isThiefTeam
-      ? "🧀 チーズドロボーチームの勝利！！"
-      : "😴 ねぼすけチームの勝利！！";
+    const winText = isThiefTeam ? "🧀 チーズドロボーチームの勝利！！" : "😴 ねぼすけチームの勝利！！";
+
+    // ⑥ 投票結果を1行ずつ別エントリで書き込む（縦並び）
+    const resultEntries = [{ type: "system", text: "━━ 投票結果 ━━" }];
+    for (let voter in data.votes) {
+      resultEntries.push({ type: "system", text: `${voter}　▶　${data.votes[voter]}` });
+    }
+    resultEntries.push({ type: "system", text: `最多票：${executed}（${executedLabel}）` });
+    resultEntries.push({ type: "win", text: winText });
 
     const ref = doc(db, "rooms", currentRoom);
-    await updateDoc(ref, {
-      chatLog: arrayUnion(
-        { type: "system", text: "━━ 投票結果 ━━" },
-        { type: "system", text: logLines.join("\n") },
-        { type: "system", text: `最多票：${executed}（${executedLabel}）` },
-        { type: "win",    text: winText }
-      )
-    });
+    // arrayUnionは同じオブジェクトの重複を避けるので1件ずつpush
+    let chatLog = (await getDoc(ref)).data().chatLog || [];
+    chatLog = chatLog.concat(resultEntries);
+    await updateDoc(ref, { chatLog });
 
-    // もう一回ボタン表示
     document.getElementById("startBtn").style.display = "block";
     document.getElementById("startBtn").textContent = "もう一回";
     document.getElementById("startBtn").onclick = replayGame;
@@ -516,14 +525,13 @@ window.replayGame = async function () {
   resetGameUI();
   document.getElementById("startBtn").textContent = "ゲーム開始";
   document.getElementById("startBtn").onclick = startGame;
-  document.getElementById("replayWait").textContent = "";
   await startGame();
 };
 
 // ===== UIリセット =====
 
 function resetGameUI() {
-  window._nightChatDone = false;
+  // ⑦ チャットDOMとカウンタをリセット（startGameがchatLogを[]で上書きするのと連動）
   chatRenderedCount = 0;
   lastPhase = null;
   document.getElementById("chatLog").innerHTML = "";
