@@ -171,7 +171,7 @@ window.startGame = async function () {
     roles, wakeTimes, eatTime, votes: {},
     henchmen: players.filter((_, i) => henchmanIndices.has(i)),
     phase: "night", runoff: [],
-    chatLog: arrayUnion({ type: "system", text: "━━ ゲーム開始！夜のフェーズ ━━" })
+    chatLog: [{ type: "system", text: "━━ ゲーム開始！夜のフェーズ ━━" }]
   });
 };
 
@@ -524,6 +524,10 @@ window.replayGame = async function () {
 
 function resetGameUI() {
   window._nightChatDone = false;
+  chatRenderedCount = 0;
+  lastPhase = null;
+  document.getElementById("chatLog").innerHTML = "";
+  document.getElementById("roleMsg").textContent = "";
   document.getElementById("nightMsg").textContent = "";
   document.getElementById("nightMsg").className = "";
   document.getElementById("teamMsg").textContent = "";
