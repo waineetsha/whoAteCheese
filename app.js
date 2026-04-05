@@ -517,8 +517,8 @@ async function handleResult(data) {
     const executed = targets[0];
     const executedRole = data.roles[executed];
     const executedLabel = getRoleLabel(executedRole);
-    const isThiefTeam = executedRole === "thief" || executedRole === "henchman";
-    const winText = isThiefTeam ? "🧀 チーズドロボーチームの勝利！！" : "😴 ねぼすけチームの勝利！！";
+    const thiefCaught = executedRole === "thief";
+    const winText = thiefCaught ? "😴 ねぼすけチームの勝利！！" : "🧀 チーズドロボーチームの勝利！！";
 
     // ⑥ 投票結果を1行ずつ別エントリで書き込む（縦並び）
     const resultEntries = [{ type: "system", text: "━━ 投票結果 ━━" }];
