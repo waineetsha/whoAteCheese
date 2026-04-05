@@ -192,6 +192,12 @@ function subscribeRoom() {
       document.getElementById("startBtn").style.display = "block";
     }
 
+    // chatLogがリセットされたら（もう一回時）DOMとカウンタをクリア
+    if (data.chatLog && data.chatLog.length < chatRenderedCount) {
+      document.getElementById("chatLog").innerHTML = "";
+      chatRenderedCount = 0;
+    }
+
     // Firestoreチャット差分描画
     renderChatLog(data.chatLog);
 
@@ -551,10 +557,7 @@ window.replayGame = async function () {
 // ===== UIリセット =====
 
 function resetGameUI() {
-  // ⑦ チャットDOMとカウンタをリセット（startGameがchatLogを[]で上書きするのと連動）
-  chatRenderedCount = 0;
   lastPhase = null;
-  document.getElementById("chatLog").innerHTML = "";
   document.getElementById("roleMsg").textContent = "";
   document.getElementById("nightMsg").textContent = "";
   document.getElementById("nightMsg").className = "";
