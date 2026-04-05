@@ -146,23 +146,12 @@ window.startGame = async function () {
   const snap = await getDoc(ref);
   const players = snap.data().players;
 
-  let henchmanCount = 0;
-  if (players.length >= 5 && players.length <= 7) henchmanCount = 1;
-  if (players.length >= 8) henchmanCount = 2;
-
+  // 最初はドロボーとねぼすけのみ。手下はドロボーが選んだ後に決まる。
   let thiefIndex = Math.floor(Math.random() * players.length);
-  let nonThiefIndices = players.map((_, i) => i).filter(i => i !== thiefIndex);
-  for (let i = nonThiefIndices.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [nonThiefIndices[i], nonThiefIndices[j]] = [nonThiefIndices[j], nonThiefIndices[i]];
-  }
-  const henchmanIndices = new Set(nonThiefIndices.slice(0, henchmanCount));
 
   let roles = {};
   players.forEach((p, i) => {
-    if (i === thiefIndex) roles[p] = "thief";
-    else if (henchmanIndices.has(i)) roles[p] = "henchman";
-    else roles[p] = "sleepy";
+    roles[p] = i === thiefIndex ? "thief" : "sleepy";
   });
 
   let wakeTimes = {};
@@ -359,7 +348,11 @@ window.submitHenchmen = async function () {
   document.getElementById("henchmanSection").classList.remove("active");
 
   const ref = doc(db, "rooms", currentRoom);
-  await updateDoc(ref, { henchmen, phase: "discussion" });
+  const snap = await getDoc(ref);
+  let roles = snap.data().roles;
+  // 選ばれた人の役職を henchman に更新
+  henchmen.forEach(p => { roles[p] = "henchman"; });
+  await updateDoc(ref, { henchmen, roles, phase: "discussion" });
 };
 
 // ===== 議論 =====
@@ -552,6 +545,7 @@ async function handleResult(data) {
 
 window.replayGame = async function () {
   resetGameUI();
+  lastPhase = "starting"; // startGame完了まで全ハンドラをブロック
   document.getElementById("startBtn").textContent = "ゲーム開始";
   document.getElementById("startBtn").onclick = startGame;
   await startGame();
@@ -560,7 +554,6 @@ window.replayGame = async function () {
 // ===== UIリセット =====
 
 function resetGameUI() {
-  lastPhase = null;
   document.getElementById("roleMsg").textContent = "";
   document.getElementById("nightMsg").textContent = "";
   document.getElementById("nightMsg").className = "";
