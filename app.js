@@ -206,6 +206,7 @@ window.startGame = async function () {
 // ===== 購読 =====
 
 function subscribeRoom() {
+  document.getElementById("chatInput").style.display = "flex";
   const ref = doc(db, "rooms", currentRoom);
   onSnapshot(ref, (snap) => {
     const data = snap.data();

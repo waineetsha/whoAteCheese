@@ -337,7 +337,7 @@
   <!-- チャット -->
   <div id="chatArea">
     <div id="chatLog"></div>
-    <div id="chatInput">
+    <div id="chatInput" style="display:none;">
       <input id="msgInput" placeholder="メッセージを入力…" maxlength="200" onkeydown="if(event.key==='Enter')sendChat()">
       <button class="btn-primary" id="sendBtn" onclick="sendChat()">送信</button>
     </div>
