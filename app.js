@@ -198,7 +198,7 @@ window.startGame = async function () {
   await updateDoc(ref, {
     roles, wakeTimes, eatTime, votes: {},
     henchmen: [],
-    phase: "night", runoff: [], wakeBoard: {},
+    phase: "night", runoff: [], memos: {},
     chatLog: [{ type: "system", text: "━━ ゲーム開始！夜のフェーズ ━━" }]
   });
 };
@@ -227,8 +227,8 @@ function subscribeRoom() {
     // Firestoreチャット差分描画
     renderChatLog(data.chatLog);
 
-    // 起床盤面の更新
-    if (data.wakeBoard !== undefined) renderWakeBoard(data.wakeBoard);
+    // 共有メモの更新
+    if (data.memos) renderSharedMemos(data.memos);
 
     if (data.phase === "lobby") return;
 
@@ -268,7 +268,7 @@ function updatePlayers(players) {
 
 function handleNight(data) {
   resetGameUI();
-  document.getElementById("wakeBoard").classList.add("active");
+  document.getElementById("memoArea").classList.add("active");
 
   const role = data.roles[myName];
   const wakeTime = data.wakeTimes[myName];
@@ -609,8 +609,8 @@ function resetGameUI() {
   document.getElementById("replayWait").textContent = "";
   hasVoted = false;
   if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
-  document.getElementById("wakeBoard").classList.remove("active");
-  document.getElementById("wakeBoard").innerHTML = "";
+  const memoArea = document.getElementById("memoArea");
+  if (memoArea) { memoArea.classList.remove("active"); document.getElementById("memoSharedList").innerHTML = ""; document.getElementById("memoShareDone").style.display = "none"; }
 }
 
 // ===== 初期化：URLパラメータからルームIDを自動入力 =====
@@ -624,58 +624,31 @@ function resetGameUI() {
   document.getElementById("lobbyJoin").style.display = "flex";
 })();
 
-// ===== 起床盤面 =====
+// ===== メモ =====
 
-function renderWakeBoard(wakeBoard) {
-  const el = document.getElementById("wakeBoard");
-  if (!el.classList.contains("active")) return;
-  el.innerHTML = "";
-  for (let h = 1; h <= 6; h++) {
-    const players = (wakeBoard[String(h)] || []);
-    const row = document.createElement("div");
-    row.className = "wake-row";
-
-    const hourEl = document.createElement("div");
-    hourEl.className = "wake-hour";
-    hourEl.textContent = h + "時";
-
-    const playersEl = document.createElement("div");
-    playersEl.className = "wake-players";
-    players.forEach(p => {
-      const chip = document.createElement("span");
-      chip.className = "wake-chip" + (p === myName ? " me" : "");
-      chip.textContent = p;
-      playersEl.appendChild(chip);
-    });
-
-    const isMeHere = players.includes(myName);
-    const btn = document.createElement("button");
-    btn.className = "wake-select-btn" + (isMeHere ? " selected" : "");
-    btn.textContent = isMeHere ? "✓ 選択中" : "選択";
-    btn.onclick = () => selectWakeTime(h);
-
-    row.appendChild(hourEl);
-    row.appendChild(playersEl);
-    row.appendChild(btn);
-    el.appendChild(row);
-  }
+function renderSharedMemos(memos) {
+  const list = document.getElementById("memoSharedList");
+  if (!list) return;
+  list.innerHTML = "";
+  // 投稿順に表示（キー＝プレイヤー名、値＝{text, time}）
+  const entries = Object.entries(memos).sort((a, b) => (a[1].time || 0) - (b[1].time || 0));
+  entries.forEach(([name, val]) => {
+    const div = document.createElement("div");
+    div.className = "memo-entry";
+    div.innerHTML = `<span class="memo-name">${name}</span>${val.text}`;
+    list.appendChild(div);
+  });
 }
 
-window.selectWakeTime = async function (hour) {
+window.shareMemo = async function () {
+  const text = document.getElementById("memoInput").value.trim();
+  if (!text) return;
   const ref = doc(db, "rooms", currentRoom);
   const snap = await getDoc(ref);
-  let wb = snap.data().wakeBoard || {};
-
-  // 全時刻から自分を削除
-  for (let h = 1; h <= 6; h++) {
-    const key = String(h);
-    if (wb[key]) wb[key] = wb[key].filter(p => p !== myName);
-  }
-
-  // 選んだ時刻に追加
-  const key = String(hour);
-  if (!wb[key]) wb[key] = [];
-  wb[key].push(myName);
-
-  await updateDoc(ref, { wakeBoard: wb });
+  let memos = snap.data().memos || {};
+  memos[myName] = { text, time: Date.now() };
+  await updateDoc(ref, { memos });
+  const done = document.getElementById("memoShareDone");
+  done.style.display = "inline";
+  setTimeout(() => { done.style.display = "none"; }, 2000);
 };
