@@ -273,6 +273,66 @@
   #chatInput input::placeholder { color: var(--text-dim); }
   #chatInput input:focus { outline: none; border-color: var(--surface2); }
   #sendBtn { border-radius: 20px; padding: 8px 18px; }
+
+  /* ===== 起床盤面 ===== */
+  #wakeBoard {
+    display: none;
+    flex-direction: column;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+  #wakeBoard.active { display: flex; }
+  .wake-row {
+    display: grid;
+    grid-template-columns: 3.5em 1fr auto;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 14px;
+    border-bottom: 1px solid var(--border);
+    min-height: 38px;
+  }
+  .wake-row:last-child { border-bottom: none; }
+  .wake-hour {
+    font-size: 0.82em;
+    color: var(--text-dim);
+    white-space: nowrap;
+    font-weight: bold;
+  }
+  .wake-players {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+    min-height: 22px;
+    align-items: center;
+  }
+  .wake-chip {
+    background: var(--surface2);
+    border-radius: 20px;
+    padding: 2px 10px;
+    font-size: 0.8em;
+    color: var(--text);
+    white-space: nowrap;
+  }
+  .wake-chip.me {
+    background: var(--accent);
+    color: #fff;
+    font-weight: bold;
+  }
+  .wake-select-btn {
+    padding: 3px 10px;
+    font-size: 0.78em;
+    background: var(--surface2);
+    color: var(--text-dim);
+    border-radius: 5px;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+  .wake-select-btn.selected {
+    background: var(--accent);
+    color: #fff;
+    font-weight: bold;
+  }
 </style>
 </head>
 <body>
@@ -283,6 +343,10 @@
     <h1>🧀 チーズドロボー</h1>
     <div id="players"></div>
   </div>
+
+
+  <!-- 起床時刻盤面 -->
+  <div id="wakeBoard"></div>
 
   <!-- ゲーム操作エリア -->
   <div id="gameArea">
