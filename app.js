@@ -198,7 +198,7 @@ window.startGame = async function () {
   await updateDoc(ref, {
     roles, wakeTimes, eatTime, votes: {},
     henchmen: [],
-    phase: "night", runoff: [], memos: {},
+    phase: "night", runoff: [], memos: {}, playerComments: {},
     chatLog: [{ type: "system", text: "━━ ゲーム開始！夜のフェーズ ━━" }]
   });
 };
@@ -229,6 +229,9 @@ function subscribeRoom() {
 
     // 共有メモの更新
     if (data.memos) renderSharedMemos(data.memos);
+
+    // プレイヤーコメントの更新
+    if (data.playerComments !== undefined) renderPlayerComments(data.players, data.playerComments);
 
     if (data.phase === "lobby") return;
 
@@ -401,6 +404,10 @@ window.submitHenchmen = async function () {
 
 function handleDiscussion(data) {
   document.getElementById("henchmanSection").classList.remove("active");
+
+  // プレイヤーコメント欄を表示
+  document.getElementById("playerComments").classList.add("active");
+  renderPlayerComments(data.players, data.playerComments || {});
 
   const role = data.roles[myName];
 
@@ -609,6 +616,9 @@ function resetGameUI() {
   document.getElementById("replayWait").textContent = "";
   hasVoted = false;
   if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
+  // プレイヤーコメント欄をリセット
+  document.getElementById("playerComments").classList.remove("active");
+  document.getElementById("pcList").innerHTML = "";
   const memoArea = document.getElementById("memoArea");
   if (memoArea) { memoArea.classList.remove("active"); document.getElementById("memoSharedList").innerHTML = ""; document.getElementById("memoShareDone").style.display = "none"; }
 }
@@ -624,7 +634,92 @@ function resetGameUI() {
   document.getElementById("lobbyJoin").style.display = "flex";
 })();
 
-// ===== メモ =====
+// ===== プレイヤーコメント =====
+
+// 既読状態管理（前回の共有テキストを保持してnewバッジ判定）
+let prevPlayerComments = {};
+
+function renderPlayerComments(players, comments) {
+  const list = document.getElementById("pcList");
+  if (!list) return;
+  list.innerHTML = "";
+
+  players.forEach(name => {
+    const row = document.createElement("div");
+    row.className = "pc-row" + (name === myName ? " pc-mine" : "");
+
+    const nameEl = document.createElement("span");
+    nameEl.className = "pc-name";
+    nameEl.textContent = name;
+    row.appendChild(nameEl);
+
+    if (name === myName) {
+      // 自分：入力欄＋共有ボタン
+      const wrap = document.createElement("div");
+      wrap.className = "pc-input-wrap";
+
+      const input = document.createElement("input");
+      input.className = "pc-input";
+      input.id = "pcInput";
+      input.placeholder = "コメントを入力…";
+      input.maxLength = 100;
+      // 既に共有済みのテキストがあれば入力欄に表示
+      if (comments[myName]) input.value = comments[myName].text || "";
+      input.addEventListener("keydown", e => { if (e.key === "Enter") sharePlayerComment(); });
+
+      const btn = document.createElement("button");
+      btn.className = "btn-pc-share";
+      btn.textContent = "共有";
+      btn.onclick = sharePlayerComment;
+
+      wrap.appendChild(input);
+      wrap.appendChild(btn);
+      row.appendChild(wrap);
+    } else {
+      // 他プレイヤー：テキスト or 未共有
+      const entry = comments[name];
+      const text = document.createElement("span");
+      text.className = "pc-text" + (entry ? "" : " pc-empty");
+      text.textContent = entry ? entry.text : "（未共有）";
+      row.appendChild(text);
+
+      // 前回から更新されていたらnewバッジ
+      if (entry && (!prevPlayerComments[name] || prevPlayerComments[name].text !== entry.text)) {
+        const badge = document.createElement("span");
+        badge.className = "pc-new-badge";
+        badge.textContent = "new";
+        row.appendChild(badge);
+        // 5秒後にバッジを消す
+        setTimeout(() => { if (badge.parentNode) badge.parentNode.removeChild(badge); }, 5000);
+      }
+
+      if (!entry) {
+        const lock = document.createElement("span");
+        lock.className = "pc-lock";
+        lock.textContent = "🔒";
+        row.appendChild(lock);
+      }
+    }
+
+    list.appendChild(row);
+  });
+
+  prevPlayerComments = JSON.parse(JSON.stringify(comments));
+}
+
+window.sharePlayerComment = async function () {
+  const input = document.getElementById("pcInput");
+  if (!input) return;
+  const text = input.value.trim();
+  if (!text || !currentRoom) return;
+
+  const ref = doc(db, "rooms", currentRoom);
+  const snap = await getDoc(ref);
+  let playerComments = snap.data().playerComments || {};
+  playerComments[myName] = { text, time: Date.now() };
+  await updateDoc(ref, { playerComments });
+};
+
 
 function renderSharedMemos(memos) {
   const list = document.getElementById("memoSharedList");

@@ -332,6 +332,103 @@
     color: var(--text-dim);
     display: none;
   }
+
+  /* ===== プレイヤーコメント ===== */
+  #playerComments {
+    display: none;
+    flex-direction: column;
+    gap: 6px;
+    padding: 10px 14px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+  }
+  #playerComments.active { display: flex; }
+  .pc-title {
+    font-size: 0.78em;
+    color: var(--text-dim);
+    letter-spacing: 0.05em;
+    margin-bottom: 2px;
+  }
+  .pc-list {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+  }
+  .pc-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--surface2);
+    border-radius: 8px;
+    padding: 6px 10px;
+    min-height: 34px;
+  }
+  .pc-row.pc-mine {
+    background: #1a2a4a;
+    border: 1px solid #2a3a6a;
+  }
+  .pc-name {
+    font-size: 0.78em;
+    font-weight: bold;
+    color: var(--accent2);
+    min-width: 60px;
+    flex-shrink: 0;
+  }
+  .pc-mine .pc-name { color: var(--sys-color); }
+  .pc-text {
+    flex: 1;
+    font-size: 0.82em;
+    color: var(--text);
+    line-height: 1.4;
+  }
+  .pc-text.pc-empty { color: var(--text-dim); font-style: italic; }
+  .pc-input-wrap {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .pc-input {
+    flex: 1;
+    padding: 4px 8px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text);
+    font-size: 0.82em;
+    font-family: inherit;
+    height: 26px;
+  }
+  .pc-input::placeholder { color: var(--text-dim); }
+  .pc-input:focus { outline: none; border-color: var(--surface2); }
+  .btn-pc-share {
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    border-radius: 6px;
+    font-size: 0.78em;
+    padding: 4px 10px;
+    cursor: pointer;
+    white-space: nowrap;
+    height: 26px;
+    font-family: inherit;
+    transition: opacity 0.15s;
+  }
+  .btn-pc-share:hover { opacity: 0.82; }
+  .pc-new-badge {
+    font-size: 0.7em;
+    background: #2a7a4a;
+    color: #6bff9e;
+    border-radius: 4px;
+    padding: 1px 5px;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+  .pc-lock {
+    font-size: 0.75em;
+    color: #444;
+    flex-shrink: 0;
+  }
 </style>
 </head>
 <body>
@@ -388,6 +485,12 @@
 
     <!-- スタート / もう一回 -->
     <div id="roleMsg"></div>
+
+    <!-- プレイヤーコメント（議論フェーズのみ表示） -->
+    <div id="playerComments">
+      <div class="pc-title">プレイヤーコメント</div>
+      <div class="pc-list" id="pcList"></div>
+    </div>
 
     <!-- メモ -->
     <div id="memoArea">
