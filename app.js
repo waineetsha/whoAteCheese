@@ -103,24 +103,53 @@ window.sendChat = async function () {
 
 // ===== ロビー =====
 
+function generateRoomId() {
+  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  let id = "";
+  for (let i = 0; i < 6; i++) id += chars[Math.floor(Math.random() * chars.length)];
+  return id;
+}
+
 window.createRoom = async function () {
-  myName = document.getElementById("nameInput").value.trim();
-  const room = document.getElementById("roomInput").value.trim();
-  if (!myName || !room) return;
+  myName = document.getElementById("nameInputCreate").value.trim();
+  if (!myName) { alert("名前を入力してください"); return; }
+  const room = generateRoomId();
   const ref = doc(db, "rooms", room);
   await setDoc(ref, {
     players: [myName], phase: "lobby", host: myName,
     chatLog: [{ type: "system", text: `ルーム「${room}」が作成されました` }]
   });
   currentRoom = room;
-  document.getElementById("lobbyArea").style.display = "none";
+
+  // URLを更新してコピーボタンを表示
+  const url = location.origin + location.pathname + "?room=" + room;
+  history.replaceState(null, "", "?room=" + room);
+  document.getElementById("lobbyCreate").style.display = "none";
+  showRoomUrl(url);
   subscribeRoom();
 };
 
+function showRoomUrl(url) {
+  let bar = document.getElementById("roomUrlBar");
+  if (!bar) {
+    bar = document.createElement("div");
+    bar.id = "roomUrlBar";
+    bar.style.cssText = "display:flex;align-items:center;gap:8px;padding:8px 0;flex-wrap:wrap;";
+    document.getElementById("gameArea").prepend(bar);
+  }
+  bar.innerHTML = `
+    <span style="font-size:0.82em;color:var(--text-dim);">招待URL：</span>
+    <code style="font-size:0.78em;background:var(--bg);border:1px solid var(--border);border-radius:5px;padding:4px 8px;color:var(--accent2);word-break:break-all;">${url}</code>
+    <button class="btn-secondary" id="copyUrlBtn" onclick="copyRoomUrl('${url}')" style="padding:5px 12px;font-size:0.82em;">📋 コピー</button>
+  `;
+}
+
 window.joinRoom = async function () {
-  myName = document.getElementById("nameInput").value.trim();
-  const room = document.getElementById("roomInput").value.trim();
-  if (!myName || !room) return;
+  myName = document.getElementById("nameInputJoin").value.trim();
+  const roomInputEl = null; // room ID comes from URL param
+  const room = (roomInputEl ? roomInputEl.value.trim() : "") || new URLSearchParams(location.search).get("room");
+  if (!myName) { alert("名前を入力してください"); return; }
+  if (!room) { alert("ルームIDを入力してください"); return; }
   const ref = doc(db, "rooms", room);
   const snap = await getDoc(ref);
   if (!snap.exists()) { alert("ルームがありません"); return; }
@@ -132,8 +161,15 @@ window.joinRoom = async function () {
     chatLog: arrayUnion({ type: "system", text: `${myName} が参加しました` })
   });
   currentRoom = room;
-  document.getElementById("lobbyArea").style.display = "none";
+  document.getElementById("lobbyJoin").style.display = "none";
   subscribeRoom();
+};
+
+window.copyRoomUrl = function (url) {
+  navigator.clipboard.writeText(url).then(() => {
+    const btn = document.getElementById("copyUrlBtn");
+    if (btn) { btn.textContent = "✅ コピーしました"; setTimeout(() => { btn.textContent = "📋 コピー"; }, 2000); }
+  });
 };
 
 // ===== ゲーム開始 =====
@@ -569,3 +605,14 @@ function resetGameUI() {
   hasVoted = false;
   if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
 }
+
+// ===== 初期化：URLパラメータからルームIDを自動入力 =====
+(function initFromUrl() {
+  const params = new URLSearchParams(location.search);
+  const roomId = params.get("room");
+  if (!roomId) return;
+
+  // URLにルームIDがある場合：参加モードに切り替え
+  document.getElementById("lobbyCreate").style.display = "none";
+  document.getElementById("lobbyJoin").style.display = "flex";
+})();

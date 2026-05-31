@@ -84,22 +84,22 @@
   }
 
   /* ロビー */
-  #lobbyArea {
+  #lobbyCreate, #lobbyJoin {
     display: flex;
     flex-wrap: wrap;
     gap: 8px;
     align-items: center;
   }
-  #lobbyArea input {
+  #lobbyCreate input, #lobbyJoin input {
     padding: 7px 10px;
     background: var(--bg);
     border: 1px solid var(--border);
     border-radius: 6px;
     color: var(--text);
     font-size: 0.95em;
-    width: 130px;
+    width: 160px;
   }
-  #lobbyArea input::placeholder { color: var(--text-dim); }
+  #lobbyCreate input::placeholder, #lobbyJoin input::placeholder { color: var(--text-dim); }
 
   /* ボタン共通 */
   button {
@@ -287,12 +287,16 @@
   <!-- ゲーム操作エリア -->
   <div id="gameArea">
 
-    <!-- ロビー -->
-    <div id="lobbyArea">
-      <input id="nameInput" placeholder="名前" maxlength="12">
-      <input id="roomInput" placeholder="ルームID">
-      <button class="btn-primary" onclick="createRoom()">作成</button>
-      <button class="btn-secondary" onclick="joinRoom()">参加</button>
+    <!-- ロビー（作成モード） -->
+    <div id="lobbyCreate">
+      <input id="nameInputCreate" placeholder="名前を入力" maxlength="12">
+      <button class="btn-primary" onclick="createRoom()">🧀 部屋を作る</button>
+    </div>
+
+    <!-- ロビー（参加モード） -->
+    <div id="lobbyJoin" style="display:none;">
+      <input id="nameInputJoin" placeholder="名前を入力" maxlength="12">
+      <button class="btn-primary" onclick="joinRoom()">🚪 参加する</button>
     </div>
 
     <!-- 夜・チーム情報（自分だけに見える） -->
